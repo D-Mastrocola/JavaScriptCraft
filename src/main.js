@@ -9,12 +9,9 @@ let controls;
 let boxWidth;
 let boxHeight;
 let boxDepth;
-let geometry;
-let material;
-
 let world;
 
-let noiseInc = .05;
+let noiseInc = 0.025;
 
 let init = () => {
   noise.seed(Math.round(Math.random() * 65536));
@@ -26,14 +23,13 @@ let init = () => {
   far = 100;
   fov = 75;
   camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-  camera.position.z = 60;
-  camera.position.y = 30;
-  camera.position.x = 25;
+  camera.position.z = 40;
+  camera.position.y = 20;
+  camera.position.x = 0;
 
-  controls = new THREE.OrbitControls( camera, renderer.domElement );
-  controls.target.set(25,5,25)
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(16, 5, 16);
   controls.update();
-  
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color("skyblue");
@@ -42,31 +38,60 @@ let init = () => {
     const color = 0xffffff;
     const intensity = 1;
     const light = new THREE.DirectionalLight(color, intensity);
-    light.position.set(-1, 2, 4);
+    light.position.set(-8, 32, -8);
+    const light2 = new THREE.DirectionalLight(color, intensity);
+    light2.position.set(40, 16, 40);
     scene.add(light);
+    scene.add(light2);
   }
 
-  world = [];
+  world = new World();
 
   let xOff = 0.01;
   let yOff = 0.01;
   let zOff = 0.01;
-  for (let xN = 0; xN < 50; xN++) {
+  for (let xN = 0; xN < 32; xN++) {
     console.log(noise.perlin3(xOff, yOff, zOff));
-    world.push([]);
-    for(let zN = 0; zN < 50; zN++) {
-      world[xN].push([]);
-      for(let yN = 0; yN < Math.abs(noise.perlin3(xOff, yOff, zOff) * 20) + 5; yN++) {
-        let block = new Block(xN, yN, zN, scene);
-        world[xN][zN].push(block);
+    for (let zN = 0; zN < 32; zN++) {
+      for (
+        let yN = 0;
+        yN < Math.abs(noise.perlin3(xOff, yOff, zOff) * 32) + 5;
+        yN++
+      ) {
+        world.setVoxel(xN, yN, zN, 1);
         yOff += noiseInc;
       }
       zOff += noiseInc;
-      yOff = .01;
+      yOff = 0.01;
     }
-    zOff = .01;
+    zOff = 0.01;
     xOff += noiseInc;
   }
+  const { positions, normals, indices } = world.generateGeometryDataForCell(
+    0,
+    0,
+    0
+  );
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.MeshLambertMaterial({ color: "green" });
+
+  const positionNumComponents = 3;
+  const normalNumComponents = 3;
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(
+      new Float32Array(positions),
+      positionNumComponents
+    )
+  );
+  geometry.setAttribute(
+    "normal",
+    new THREE.BufferAttribute(new Float32Array(normals), normalNumComponents)
+  );
+  geometry.setIndex(indices);
+  const mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
+
   console.log(world);
   requestAnimationFrame(render);
 };
