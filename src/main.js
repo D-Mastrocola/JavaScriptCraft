@@ -12,9 +12,13 @@ let boxDepth;
 let geometry;
 let material;
 
-let world;
+let world = [];
+let worldSize = {
+  x: 1,
+  z: 1,
+};
 
-let noiseInc = .05;
+let noiseInc;
 
 let init = () => {
   noise.seed(Math.round(Math.random() * 65536));
@@ -30,10 +34,9 @@ let init = () => {
   camera.position.y = 30;
   camera.position.x = 25;
 
-  controls = new THREE.OrbitControls( camera, renderer.domElement );
-  controls.target.set(25,5,25)
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(worldSize.x*32/2, 5, worldSize.z*32/2);
   controls.update();
-  
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color("skyblue");
@@ -45,28 +48,14 @@ let init = () => {
     light.position.set(-1, 2, 4);
     scene.add(light);
   }
-
-  world = [];
-
-  let xOff = 0.01;
-  let yOff = 0.01;
-  let zOff = 0.01;
-  for (let xN = 0; xN < 50; xN++) {
-    console.log(noise.perlin3(xOff, yOff, zOff));
-    world.push([]);
-    for(let zN = 0; zN < 50; zN++) {
-      world[xN].push([]);
-      for(let yN = 0; yN < Math.abs(noise.perlin3(xOff, yOff, zOff) * 20) + 5; yN++) {
-        let block = new Block(xN, yN, zN, scene);
-        world[xN][zN].push(block);
-        yOff += noiseInc;
-      }
-      zOff += noiseInc;
-      yOff = .01;
+  let noiseInc = 0.03;
+  for (let x = 0; x < worldSize.x; x++) {
+    for (let z = 0; z < worldSize.z; z++) {
+      let chunk = new Chunk(x, 0, z, noiseInc);
+      world.push(chunk);
     }
-    zOff = .01;
-    xOff += noiseInc;
   }
+
   console.log(world);
   requestAnimationFrame(render);
 };
@@ -95,11 +84,7 @@ function render(time) {
   }
   //controls.update();
   for (let i = 0; i < world.length; i++) {
-    for (let j = 0; j < world[i].length; j++) {
-      for (let k = 0; k < world[i][j].length; k++) {
-        world[i][j][k].update();
-      }
-    }
+    world[i].update();
   }
   renderer.render(scene, camera);
 
