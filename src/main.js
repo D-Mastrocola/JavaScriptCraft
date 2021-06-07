@@ -1,5 +1,5 @@
-import * as THREE from "./three.js-master/build/three.module.js";
-import { PointerLockControls } from "./three.js-master/examples/jsm/controls/PointerLockControls.js";
+import * as THREE from "./three.js-master/three.js-master/build/three.module.js";
+import { PointerLockControls } from "./three.js-master/three.js-master/examples/jsm/controls/PointerLockControls.js";
 
 class VoxelWorld {
   constructor(cellSize) {
@@ -157,8 +157,8 @@ function main() {
     s: false,
     d: false,
     shift: false,
-    space: false
-  }
+    space: false,
+  };
   var clock = new THREE.Clock();
   const canvas = document.querySelector("#canvas");
   const renderer = new THREE.WebGLRenderer({ canvas });
@@ -174,7 +174,7 @@ function main() {
 
   const controls = new PointerLockControls(camera, canvas);
   //controls.target(cellSize / 2, cellSize / 2, cellSize / 2);
-  controls.lookSpeed = .15;
+  controls.lookSpeed = 0.15;
   controls.movementSpeed = 30;
 
   const scene = new THREE.Scene();
@@ -184,8 +184,8 @@ function main() {
     const color = 0xffffff;
     const intensity = 1;
     const light = new THREE.DirectionalLight(color, intensity);
+    light.position.set(x, y, z);
     scene.add(light);
-    scene.add(light2);
   }
   addLight(-1, 2, 4);
   addLight(1, -1, -2);
@@ -272,57 +272,52 @@ function main() {
       camera.updateProjectionMatrix();
     }
     //check keys
-    if(keys.space) camera.position.y += .5;
-    if(keys.shift) camera.position.y -= .5;
+    if (keys.w) camera.position.z -= 0.5;
+    if (keys.space) camera.position.y += 0.5;
+    if (keys.shift) camera.position.y -= 0.5;
     renderer.render(scene, camera);
 
     requestAnimationFrame(render);
   }
   render();
-  document.addEventListener( 'click', function () {
+  document.addEventListener("click", function () {
     controls.lock();
   });
 
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener("keydown", (e) => {
     let key = e.keyCode;
-    console.log(key)
+    console.log(key);
     //W
-    if(key === 87) keys.w = true;
+    if (key === 87) keys.w = true;
     //A
-    if(key === 65) keys.a = true;
+    if (key === 65) keys.a = true;
     //S
-    if(key === 83) keys.s = true;
+    if (key === 83) keys.s = true;
     //D
-    if(key === 68) keys.d = true;
+    if (key === 68) keys.d = true;
     //space
-    if(key === 32) keys.space = true;
+    if (key === 32) keys.space = true;
     //shift
-    if(key === 16) keys.shift = true;
+    if (key === 16) keys.shift = true;
   });
-  document.addEventListener('keyup', (e) => {
+  document.addEventListener("keyup", (e) => {
     let key = e.keyCode;
     //W
-    if(key === 87) keys.w = false;
+    if (key === 87) keys.w = false;
     //A
-    if(key === 65) keys.a = false;
+    if (key === 65) keys.a = false;
     //S
-    if(key === 83) keys.s = false;
+    if (key === 83) keys.s = false;
     //D
-    if(key === 68) keys.d = false;
+    if (key === 68) keys.d = false;
     //space
-    if(key === 32) keys.space = false;
+    if (key === 32) keys.space = false;
     //shift
-    if(key === 16) keys.shift = false;
-    
-  })
-  controls.addEventListener( 'lock', function () {
+    if (key === 16) keys.shift = false;
+  });
+  controls.addEventListener("lock", function () {});
 
-  
-  } );
-  
-  controls.addEventListener( 'unlock', function () {
-  
-  } );
+  controls.addEventListener("unlock", function () {});
 }
 
 main();
