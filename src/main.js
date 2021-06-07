@@ -184,8 +184,8 @@ function main() {
     const color = 0xffffff;
     const intensity = 1;
     const light = new THREE.DirectionalLight(color, intensity);
-    light.position.set(x, y, z);
     scene.add(light);
+    scene.add(light2);
   }
   addLight(-1, 2, 4);
   addLight(1, -1, -2);
@@ -195,18 +195,6 @@ function main() {
   let xOff = 0.01;
   let yOff = 0.01;
   let zOff = 0.01;
-  let noiseInc = .025;
-
-
-  for (let y = 0; y < cellSize; ++y) {
-    for (let z = 0; z < cellSize; ++z) {
-      for (let x = 0; x < cellSize; ++x) {
-        const height = (Math.abs(noise.perlin3(xOff, yOff, zOff) * cellSize));
-        if (y < height) {
-          console.log(height)
-          world.setVoxel(x, y, z, 1);
-        }
-        xOff += noiseInc;
       }
       xOff = .01;
       zOff += noiseInc;
