@@ -1,116 +1,328 @@
-let renderer;
-let fov;
-let aspect;
-let near;
-let far;
-let camera;
-let scene;
-let controls;
-let boxWidth;
-let boxHeight;
-let boxDepth;
-let geometry;
-let material;
+import * as THREE from "./three.js-master/build/three.module.js";
+import { PointerLockControls } from "./three.js-master/examples/jsm/controls/PointerLockControls.js";
 
-let world;
+class VoxelWorld {
+  constructor(cellSize) {
+    this.cellSize = cellSize;
+    this.cellSliceSize = cellSize * cellSize;
+    this.cell = new Uint8Array(cellSize * cellSize * cellSize);
+  }
+  computeVoxelOffset(x, y, z) {
+    const { cellSize, cellSliceSize } = this;
+    const voxelX = THREE.MathUtils.euclideanModulo(x, cellSize) | 0;
+    const voxelY = THREE.MathUtils.euclideanModulo(y, cellSize) | 0;
+    const voxelZ = THREE.MathUtils.euclideanModulo(z, cellSize) | 0;
+    return voxelY * cellSliceSize + voxelZ * cellSize + voxelX;
+  }
+  getCellForVoxel(x, y, z) {
+    const { cellSize } = this;
+    const cellX = Math.floor(x / cellSize);
+    const cellY = Math.floor(y / cellSize);
+    const cellZ = Math.floor(z / cellSize);
+    if (cellX !== 0 || cellY !== 0 || cellZ !== 0) {
+      return null;
+    }
+    return this.cell;
+  }
+  setVoxel(x, y, z, v) {
+    const cell = this.getCellForVoxel(x, y, z);
+    if (!cell) {
+      return; // TODO: add a new cell?
+    }
+    const voxelOffset = this.computeVoxelOffset(x, y, z);
+    cell[voxelOffset] = v;
+  }
+  getVoxel(x, y, z) {
+    const cell = this.getCellForVoxel(x, y, z);
+    if (!cell) {
+      return 0;
+    }
+    const voxelOffset = this.computeVoxelOffset(x, y, z);
+    return cell[voxelOffset];
+  }
+  generateGeometryDataForCell(cellX, cellY, cellZ) {
+    const { cellSize } = this;
+    const positions = [];
+    const normals = [];
+    const indices = [];
+    const startX = cellX * cellSize;
+    const startY = cellY * cellSize;
+    const startZ = cellZ * cellSize;
 
-let noiseInc = .025;
+    for (let y = 0; y < cellSize; ++y) {
+      const voxelY = startY + y;
+      for (let z = 0; z < cellSize; ++z) {
+        const voxelZ = startZ + z;
+        for (let x = 0; x < cellSize; ++x) {
+          const voxelX = startX + x;
+          const voxel = this.getVoxel(voxelX, voxelY, voxelZ);
+          if (voxel) {
+            // There is a voxel here but do we need faces for it?
+            for (const { dir, corners } of VoxelWorld.faces) {
+              const neighbor = this.getVoxel(
+                voxelX + dir[0],
+                voxelY + dir[1],
+                voxelZ + dir[2]
+              );
+              if (!neighbor) {
+                // this voxel has no neighbor in this direction so we need a face.
+                const ndx = positions.length / 3;
+                for (const pos of corners) {
+                  positions.push(pos[0] + x, pos[1] + y, pos[2] + z);
+                  normals.push(...dir);
+                }
+                indices.push(ndx, ndx + 1, ndx + 2, ndx + 2, ndx + 1, ndx + 3);
+              }
+            }
+          }
+        }
+      }
+    }
 
-let init = () => {
-  noise.seed(Math.round(Math.random() * 65536));
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    return {
+      positions,
+      normals,
+      indices,
+    };
+  }
+}
 
-  aspect = window.innerWidth / window.innerHeight;
-  near = 0.1;
-  far = 200;
-  fov = 75;
-  camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-  camera.position.z = 60;
-  camera.position.y = 20;
-  camera.position.x = 0;
-
-  controls = new THREE.OrbitControls( camera, renderer.domElement );
-  controls.target.set(24,5,24)
-  controls.update();
-  
-
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color("skyblue");
-
+VoxelWorld.faces = [
   {
+    // left
+    dir: [-1, 0, 0],
+    corners: [
+      [0, 1, 0],
+      [0, 0, 0],
+      [0, 1, 1],
+      [0, 0, 1],
+    ],
+  },
+  {
+    // right
+    dir: [1, 0, 0],
+    corners: [
+      [1, 1, 1],
+      [1, 0, 1],
+      [1, 1, 0],
+      [1, 0, 0],
+    ],
+  },
+  {
+    // bottom
+    dir: [0, -1, 0],
+    corners: [
+      [1, 0, 1],
+      [0, 0, 1],
+      [1, 0, 0],
+      [0, 0, 0],
+    ],
+  },
+  {
+    // top
+    dir: [0, 1, 0],
+    corners: [
+      [0, 1, 1],
+      [1, 1, 1],
+      [0, 1, 0],
+      [1, 1, 0],
+    ],
+  },
+  {
+    // back
+    dir: [0, 0, -1],
+    corners: [
+      [1, 0, 0],
+      [0, 0, 0],
+      [1, 1, 0],
+      [0, 1, 0],
+    ],
+  },
+  {
+    // front
+    dir: [0, 0, 1],
+    corners: [
+      [0, 0, 1],
+      [1, 0, 1],
+      [0, 1, 1],
+      [1, 1, 1],
+    ],
+  },
+];
+
+function main() {
+  let keys = {
+    w: false,
+    a: false,
+    s: false,
+    d: false,
+    shift: false,
+    space: false
+  }
+  var clock = new THREE.Clock();
+  const canvas = document.querySelector("#canvas");
+  const renderer = new THREE.WebGLRenderer({ canvas });
+
+  const cellSize = 32;
+
+  const fov = 75;
+  const aspect = 2; // the canvas default
+  const near = 0.1;
+  const far = 1000;
+  const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+  camera.position.set(0, 0, cellSize * 2);
+
+  const controls = new PointerLockControls(camera, canvas);
+  //controls.target(cellSize / 2, cellSize / 2, cellSize / 2);
+  controls.lookSpeed = .15;
+  controls.movementSpeed = 30;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color("lightblue");
+
+  function addLight(x, y, z) {
     const color = 0xffffff;
     const intensity = 1;
     const light = new THREE.DirectionalLight(color, intensity);
-    light.position.set(-8, 16, -8);
-    const light2 = new THREE.DirectionalLight(color, intensity);
-    light2.position.set(40, 16, 40);
     scene.add(light);
     scene.add(light2);
   }
+  addLight(-1, 2, 4);
+  addLight(1, -1, -2);
+  const world = new VoxelWorld(cellSize);
 
-  world = [];
-
+  /* cool effect
   let xOff = 0.01;
   let yOff = 0.01;
   let zOff = 0.01;
-  for (let xN = 0; xN < 48; xN++) {
-    console.log(noise.perlin3(xOff, yOff, zOff));
-    world.push([]);
-    for(let zN = 0; zN < 48; zN++) {
-      world[xN].push([]);
-      for(let yN = 0; yN < Math.abs(noise.perlin3(xOff, yOff, zOff) * 32) + 1; yN++) {
-        let block;
-        if(yN <  Math.floor(Math.abs(noise.perlin3(xOff, yOff, zOff) * 32)/2) + 1) {
-          block = new Block(xN, yN, zN, scene, 1);
-        } else {
-          block = new Block(xN, yN, zN, scene, 0);
-        }
-        world[xN][zN].push(block);
-        yOff += noiseInc;
       }
+      xOff = .01;
       zOff += noiseInc;
-      yOff = .01;
     }
     zOff = .01;
+    yOff += noiseInc;
+  }
+  */
+  noise.seed(Math.round(Math.random() * 65536));
+  let noiseInc = 0.013;
+  let xOff = noiseInc;
+  let yOff = noiseInc;
+  let zOff = noiseInc;
+
+  for (let x = 0; x < cellSize; ++x) {
+    for (let z = 0; z < cellSize; ++z) {
+      for (
+        let y = 0;
+        y <
+        (Math.abs(noise.perlin3(xOff, yOff, zOff)) * cellSize) / 2 +
+          cellSize / 2;
+        ++y
+      ) {
+        world.setVoxel(x, y, z, 1);
+
+        yOff += noiseInc;
+      }
+      yOff = noiseInc;
+      zOff += noiseInc;
+    }
+    zOff = noiseInc;
     xOff += noiseInc;
   }
-  console.log(world);
-  requestAnimationFrame(render);
-};
 
-//Keeps the proportions no matter the screen size;
-function resizeRendererToDisplaySize(renderer) {
-  const canvas = renderer.domElement;
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  const needResize = canvas.width !== width || canvas.height !== height;
-  const crosshair = document.getElementById("crosshair");
-  if (needResize) {
-    renderer.setSize(width, height, false);
-    crosshair.style.top = window.innerHeight / 2 + "px";
-    crosshair.style.left = window.innerWidth / 2 + "px";
-  }
-  return needResize;
-}
+  const { positions, normals, indices } = world.generateGeometryDataForCell(
+    0,
+    0,
+    0
+  );
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.MeshLambertMaterial({ color: "green" });
 
-//Game loop
-function render(time) {
-  if (resizeRendererToDisplaySize(renderer)) {
+  const positionNumComponents = 3;
+  const normalNumComponents = 3;
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(
+      new Float32Array(positions),
+      positionNumComponents
+    )
+  );
+  geometry.setAttribute(
+    "normal",
+    new THREE.BufferAttribute(new Float32Array(normals), normalNumComponents)
+  );
+  geometry.setIndex(indices);
+  const mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
+
+  function resizeRendererToDisplaySize(renderer) {
     const canvas = renderer.domElement;
-    camera.aspect = canvas.clientWidth / canvas.clientHeight;
-    camera.updateProjectionMatrix();
-  }
-  //controls.update();
-  for (let i = 0; i < world.length; i++) {
-    for (let j = 0; j < world[i].length; j++) {
-      for (let k = 0; k < world[i][j].length; k++) {
-        world[i][j][k].update();
-      }
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const needResize = canvas.width !== width || canvas.height !== height;
+    if (needResize) {
+      renderer.setSize(width, height, false);
     }
+    return needResize;
   }
-  renderer.render(scene, camera);
 
-  requestAnimationFrame(render);
+  function render() {
+    if (resizeRendererToDisplaySize(renderer)) {
+      const canvas = renderer.domElement;
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
+    }
+    //check keys
+    if(keys.space) camera.position.y += .5;
+    if(keys.shift) camera.position.y -= .5;
+    renderer.render(scene, camera);
+
+    requestAnimationFrame(render);
+  }
+  render();
+  document.addEventListener( 'click', function () {
+    controls.lock();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    let key = e.keyCode;
+    console.log(key)
+    //W
+    if(key === 87) keys.w = true;
+    //A
+    if(key === 65) keys.a = true;
+    //S
+    if(key === 83) keys.s = true;
+    //D
+    if(key === 68) keys.d = true;
+    //space
+    if(key === 32) keys.space = true;
+    //shift
+    if(key === 16) keys.shift = true;
+  });
+  document.addEventListener('keyup', (e) => {
+    let key = e.keyCode;
+    //W
+    if(key === 87) keys.w = false;
+    //A
+    if(key === 65) keys.a = false;
+    //S
+    if(key === 83) keys.s = false;
+    //D
+    if(key === 68) keys.d = false;
+    //space
+    if(key === 32) keys.space = false;
+    //shift
+    if(key === 16) keys.shift = false;
+    
+  })
+  controls.addEventListener( 'lock', function () {
+
+  
+  } );
+  
+  controls.addEventListener( 'unlock', function () {
+  
+  } );
 }
 
-init();
+main();
