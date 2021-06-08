@@ -1,5 +1,6 @@
-import * as THREE from "./three.js-master/three.js-master/build/three.module.js";
-import { PointerLockControls } from "./three.js-master/three.js-master/examples/jsm/controls/PointerLockControls.js";
+import * as THREE from "./three.js-master/build/three.module.js";
+import { PointerLockControls } from "./three.js-master/examples/jsm/controls/PointerLockControls.js";
+import Player from "./objects/player.js";
 
 class VoxelWorld {
   constructor(cellSize) {
@@ -151,26 +152,26 @@ VoxelWorld.faces = [
 ];
 
 function main() {
-  let keys = {
-    w: false,
-    a: false,
-    s: false,
-    d: false,
-    shift: false,
-    space: false,
-  };
-  var clock = new THREE.Clock();
+  const GRAVITY = -.05;
+  const mouse = new THREE.Vector2(0, 0);
   const canvas = document.querySelector("#canvas");
   const renderer = new THREE.WebGLRenderer({ canvas });
 
-  const cellSize = 32;
+  const cellSize = 256;
 
   const fov = 75;
   const aspect = 2; // the canvas default
   const near = 0.1;
   const far = 1000;
   const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-  camera.position.set(0, 0, cellSize * 2);
+  camera.position.set(cellSize/2, cellSize*.75, cellSize/2);
+
+  const raycaster = new THREE.Raycaster();
+  let player = new Player(
+    camera.position.x,
+    camera.position.y,
+    camera.position.z
+  );
 
   const controls = new PointerLockControls(camera, canvas);
   //controls.target(cellSize / 2, cellSize / 2, cellSize / 2);
@@ -191,20 +192,8 @@ function main() {
   addLight(1, -1, -2);
   const world = new VoxelWorld(cellSize);
 
-  /* cool effect
-  let xOff = 0.01;
-  let yOff = 0.01;
-  let zOff = 0.01;
-      }
-      xOff = .01;
-      zOff += noiseInc;
-    }
-    zOff = .01;
-    yOff += noiseInc;
-  }
-  */
   noise.seed(Math.round(Math.random() * 65536));
-  let noiseInc = 0.013;
+  let noiseInc = Math.random() * .035;
   let xOff = noiseInc;
   let yOff = noiseInc;
   let zOff = noiseInc;
@@ -213,9 +202,7 @@ function main() {
     for (let z = 0; z < cellSize; ++z) {
       for (
         let y = 0;
-        y <
-        (Math.abs(noise.perlin3(xOff, yOff, zOff)) * cellSize) / 2 +
-          cellSize / 2;
+        y < (Math.abs(noise.perlin3(xOff, yOff, zOff)) * 64) / 2 + cellSize / 2;
         ++y
       ) {
         world.setVoxel(x, y, z, 1);
@@ -254,6 +241,14 @@ function main() {
   const mesh = new THREE.Mesh(geometry, material);
   scene.add(mesh);
 
+  function onMouseMove(event) {
+    // calculate mouse position in normalized device coordinates
+    // (-1 to +1) for both components
+
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  }
+
   function resizeRendererToDisplaySize(renderer) {
     const canvas = renderer.domElement;
     const width = canvas.clientWidth;
@@ -266,15 +261,25 @@ function main() {
   }
 
   function render() {
+    // update the picking ray with the camera and mouse position
+    raycaster.setFromCamera(mouse, camera);
+
+    player.update(camera, raycaster, GRAVITY);
+
     if (resizeRendererToDisplaySize(renderer)) {
       const canvas = renderer.domElement;
       camera.aspect = canvas.clientWidth / canvas.clientHeight;
       camera.updateProjectionMatrix();
     }
+    /*
     //check keys
     if (keys.w) camera.position.z -= 0.5;
+    if (keys.a) camera.position.x -= 0.5;
+    if (keys.s) camera.position.z += 0.5;
+    if (keys.d) camera.position.x += 0.5;
     if (keys.space) camera.position.y += 0.5;
     if (keys.shift) camera.position.y -= 0.5;
+    */
     renderer.render(scene, camera);
 
     requestAnimationFrame(render);
@@ -286,34 +291,33 @@ function main() {
 
   document.addEventListener("keydown", (e) => {
     let key = e.keyCode;
-    console.log(key);
     //W
-    if (key === 87) keys.w = true;
+    if (key === 87) player.keysPressed.w = true;
     //A
-    if (key === 65) keys.a = true;
+    if (key === 65) player.keysPressed.a = true;
     //S
-    if (key === 83) keys.s = true;
+    if (key === 83) player.keysPressed.s = true;
     //D
-    if (key === 68) keys.d = true;
+    if (key === 68) player.keysPressed.d = true;
     //space
-    if (key === 32) keys.space = true;
+    if (key === 32) player.keysPressed.space = true;
     //shift
-    if (key === 16) keys.shift = true;
+    if (key === 16) player.keysPressed.shift = true;
   });
   document.addEventListener("keyup", (e) => {
     let key = e.keyCode;
     //W
-    if (key === 87) keys.w = false;
+    if (key === 87) player.keysPressed.w = false;
     //A
-    if (key === 65) keys.a = false;
+    if (key === 65) player.keysPressed.a = false;
     //S
-    if (key === 83) keys.s = false;
+    if (key === 83) player.keysPressed.s = false;
     //D
-    if (key === 68) keys.d = false;
+    if (key === 68) player.keysPressed.d = false;
     //space
-    if (key === 32) keys.space = false;
+    if (key === 32) player.keysPressed.space = false;
     //shift
-    if (key === 16) keys.shift = false;
+    if (key === 16) player.keysPressed.shift = false;
   });
   controls.addEventListener("lock", function () {});
 
