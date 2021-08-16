@@ -20,4 +20,6 @@ p {
     background-color: #ccc;
     border: 1px solid #000;
     position: absolute;
+    top: calc(50% - 3px);
+    left: calc(50% - 3px);
 }
